@@ -1,0 +1,231 @@
+---
+title: "FinalSubmission"
+author: "Isha Ganavdiya"
+date: "2024-08-29"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+#Step 1: Setting Up the Environment
+#Loading the necessary libraries and reading the data files.
+
+
+```{r}
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+
+# Load metadata
+metadata <- read.csv('/Users/ishaganavdiya/Downloads/QBS103_GSE157103_series_matrix.csv')
+# Load gene expression data
+genes_data <- read.csv('/Users/ishaganavdiya/Downloads/QBS103_GSE157103_genes.csv')
+
+
+# Display the first few rows of each dataset to ensure they loaded correctly
+head(genes_data)
+head(metadata)
+```
+
+#It seems like we have a unique data structure.
+
+#Gene expression data: The column names are participant IDs.
+#Metadata: Contains a column with participant IDs.
+#This means we need to reshape the gene expression data before merging.
+
+#Reshaping the Gene Expression Data
+
+#We'll use the tidyr package to reshape the data from wide to long format.
+
+#install.packages("tidyverse")
+
+
+```{r}
+library(tidyverse)
+
+library(dplyr)
+library(tidyr)
+# Reshape the genes_data from wide to long format
+long_genes_data <- genes_data %>% pivot_longer(cols = -1,          # Exclude the first column which has gene names
+               names_to = "participant_id", # Column names are participant IDs
+               values_to = "gene_expression") %>%  # Gene expression values
+  rename(gene_name = X)            # Rename the first column to 'gene_name'
+
+
+# Check the reshaped data
+head(long_genes_data)
+```{r}
+
+# Check column names in metadata
+colnames(metadata)
+
+# Rename columns if necessary
+#metadata <- metadata %>%
+   
+  # Merge the reshaped genes_data with metadata
+combined_data <- merge(long_genes_data, metadata, by = "participant_id")
+
+# Check the merged data
+head(combined_data)
+```
+
+# Install ggplot2 if it is not already installed
+if (!require(ggplot2)) {
+  install.packages("ggplot2")
+}
+
+# Load ggplot2
+library(ggplot2)
+
+# Check if ggplot2 is loaded
+exists("ggplot")
+
+```{r}
+# Histogram of Gene Expression
+ggplot(combined_data, aes(x = gene_expression)) +
+  geom_histogram(binwidth = 5, fill = "blue", color = "black") +
+  labs(title = "Histogram of Gene Expression", x = "Gene Expression", y = "Frequency")
+```
+
+```{r}
+# Scatterplot of Gene Expression vs Continuous Covariate (e.g., 'age')
+ggplot(combined_data, aes(x = age, y = gene_expression)) +
+  geom_point() +
+  labs(title = "Scatterplot of Gene Expression vs Age", x = "Age", y = "Gene Expression")
+```
+
+```{r}
+#Boxplot of Gene Expression by Two Categorical Covariates (e.g., Sex and Type)
+ggplot(combined_data, aes(x = interaction(sex, type), y = gene_expression)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Gene Expression by Sex and Type", x = "Sex and Type", y = "Gene Expression")
+
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(tidyr)
+library(pheatmap)
+
+# Check the column names in the metadata dataframe to see the actual names
+print(colnames(metadata))
+
+# Example: Selecting 10 random genes for the heatmap (replace with your specific genes of interest)
+selected_genes <- unique(combined_data$gene_name)[1:10]  # Adjust selection as needed
+
+# Filter data for the selected genes
+heatmap_data <- combined_data %>%
+  filter(gene_name %in% selected_genes) %>%
+  select(participant_id, gene_name, gene_expression) %>%
+  spread(key = gene_name, value = gene_expression)
+
+# Convert to a matrix format suitable for pheatmap
+heatmap_matrix <- as.matrix(heatmap_data[,-1])  # Exclude the 'participant_id' column
+
+# Ensure participant IDs are in the row names of the heatmap matrix
+rownames(heatmap_matrix) <- heatmap_data$participant_id
+
+# List the column names in metadata to verify their names
+print(colnames(metadata))
+
+# Adjust the column names based on the actual names found in metadata
+# Replace 'Gender' and 'Group' with the correct column names
+# e.g., replace with actual column names if they are different, such as 'sex' or 'group'
+
+# For demonstration, I'm using placeholder names; replace with actual column names.
+# E.g., if 'Gender' is actually 'sex' in your data, use 'sex' instead.
+annotation_data <- metadata %>%
+  filter(participant_id %in% heatmap_data$participant_id) %>%
+  select(sex, type)  # Replace 'sex' and 'type' with actual column names in your metadata
+
+# Set row names to match heatmap matrix participant IDs
+rownames(annotation_data) <- heatmap_data$participant_id
+
+# Check if 'annotation_data' is created correctly
+print(annotation_data)
+
+# Generate the heatmap with clustering and annotation
+pheatmap(heatmap_matrix, 
+         annotation_row = annotation_data, 
+         cluster_rows = TRUE, 
+         cluster_cols = TRUE, 
+         show_rownames = FALSE,
+         show_colnames = TRUE,
+         main = "Heatmap of Gene Expression")
+```
+
+```{r}
+# Load required libraries
+library(ggplot2)
+
+# Replace 'Gender' with the actual column name you want to use for the violin plot
+# Assuming 'sex' and 'gene_expression' are the correct column names
+
+ggplot(combined_data, aes(x = sex, y = gene_expression, fill = sex)) +  # Replace 'sex' with the actual column name
+  geom_violin(trim = FALSE) +
+  labs(title = "Violin Plot of Gene Expression by Sex", 
+       x = "Sex", 
+       y = "Gene Expression") +
+  theme_minimal()
+```
+
+
+
+```{r, results='asis'}
+# Load required libraries
+library(dplyr)
+library(knitr)
+library(kableExtra) # for formatting 
+
+# Sample metadata for illustration purposes
+metadata <- data.frame(
+  Age = c(34, 45, 23, 56, 67, 29, 38, 41),
+  Ferritin = c(100, 200, 150, 300, 250, 190, 210, 160),
+  Procalcitonin = c(0.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.3, 0.2),
+  Lactate = c(1.1, 1.2, 1.3, 1.5, 1.4, 1.3, 1.2, 1.1),
+  Gender = c("Male", "Female", "Female", "Male", "Female", "Male", "Female", "Male"),
+  Group = c("A", "A", "B", "B", "A", "B", "B", "A")
+)
+
+# Stratify by a categorical variable (e.g., Gender)
+summary_table <- metadata %>%
+  group_by(Gender) %>%
+  reframe(
+    Age_mean_sd = paste0(round(mean(Age, na.rm = TRUE), 1), " (", round(sd(Age, na.rm = TRUE), 1), " )"),
+    Ferritin_median_iqr = paste0(median(Ferritin, na.rm = TRUE), " [", IQR(Ferritin, na.rm = TRUE), " ]"),
+    Procalcitonin_mean_sd = paste0(round(mean(Procalcitonin, na.rm = TRUE), 1), " (", round(sd(Procalcitonin, na.rm = TRUE), 1), " )"),
+    Lactate_mean_sd = paste0(round(mean(Lactate, na.rm = TRUE), 1), " (", round(sd(Lactate, na.rm = TRUE), 1), " )"))
+summary_table
+# Generate LaTeX table using kable
+kable(summary_table, format = 'latex', booktabs = TRUE, caption = "Summary Statistics by Gender")
+# Print the LaTeX code
+#cat(latex_table)
+```
+
+
